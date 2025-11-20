@@ -1,7 +1,7 @@
 // The Swift Programming Language
 // https://docs.swift.org/swift-book
 
-public protocol JSONSchemaRepresentable: Sendable {
+public protocol JSONSchemaRepresentable: Sendable, Codable {
     static func jsonSchema() -> [String: Any]
 }
 
