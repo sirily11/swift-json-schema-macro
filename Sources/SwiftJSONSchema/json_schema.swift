@@ -1,7 +1,7 @@
 // The Swift Programming Language
 // https://docs.swift.org/swift-book
 
-public protocol JSONSchemaRepresentable {
+public protocol JSONSchemaRepresentable: Sendable {
     static func jsonSchema() -> [String: Any]
 }
 
@@ -33,4 +33,5 @@ public protocol JSONSchemaRepresentable {
 public macro Schema() = #externalMacro(module: "SwiftJSONSchemaMacros", type: "JSONSchemaMacro")
 
 @attached(peer)
-public macro Property(description: String, example: Any? = nil) = #externalMacro(module: "SwiftJSONSchemaMacros", type: "SchemaDescriptionMacro")
+public macro Property(description: String, example: Any? = nil) =
+    #externalMacro(module: "SwiftJSONSchemaMacros", type: "SchemaDescriptionMacro")
