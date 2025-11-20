@@ -44,6 +44,7 @@ let package = Package(
         .testTarget(
             name: "SwiftJSONSchemaTests",
             dependencies: [
+                "SwiftJSONSchema",
                 "SwiftJSONSchemaMacros",
                 .product(name: "SwiftSyntaxMacrosTestSupport", package: "swift-syntax"),
             ]
