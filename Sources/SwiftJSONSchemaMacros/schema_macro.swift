@@ -2,9 +2,12 @@ import SwiftDiagnostics
 import SwiftSyntax
 import SwiftSyntaxMacros
 
-typealias JSONSchemaProperty = (name: String, type: String, isOptional: Bool, description: String?, example: String?, defaultValue: String?, enumCases: [String]?)
+typealias JSONSchemaProperty = (
+    name: String, type: String, isOptional: Bool, description: String?, example: String?,
+    defaultValue: String?, enumCases: [String]?
+)
 
-public struct JSONSchemaMacro: MemberMacro {
+public struct JSONSchemaMacro: MemberMacro, ExtensionMacro {
     public static func expansion(
         of node: AttributeSyntax,
         providingMembersOf declaration: some DeclGroupSyntax,
@@ -21,6 +24,25 @@ public struct JSONSchemaMacro: MemberMacro {
 
         return [schemaFunction]
     }
+
+    public static func expansion(
+        of node: AttributeSyntax,
+        attachedTo declaration: some DeclGroupSyntax,
+        providingExtensionsOf type: some TypeSyntaxProtocol,
+        conformingTo protocols: [TypeSyntax],
+        in context: some MacroExpansionContext
+    ) throws -> [ExtensionDeclSyntax] {
+        // Only generate extension for structs
+        guard declaration.is(StructDeclSyntax.self) else {
+            return []
+        }
+
+        let ext: DeclSyntax = """
+            extension \(type.trimmed): JSONSchemaRepresentable {}
+            """
+
+        return [ext.cast(ExtensionDeclSyntax.self)]
+    }
 }
 
 // MARK: - Generate functions
@@ -36,20 +58,20 @@ extension JSONSchemaMacro {
     ) -> String {
         // Generate the nested schema reference code
         return """
-        \(type).jsonSchema()["properties"] as! [String: Any]
-        """
+            \(type).jsonSchema()["properties"] as! [String: Any]
+            """
     }
 
     private static func handleEnumCases(_ enumCases: [String]) -> String {
         if enumCases.allSatisfy({ $0.first == "\"" || Int($0) != nil }) {
             return """
-            "type": "\(enumCases.first?.first == "\"" ? "string" : "number")",
-            "enum": [\(enumCases.joined(separator: ", "))]
-            """
+                "type": "\(enumCases.first?.first == "\"" ? "string" : "number")",
+                "enum": [\(enumCases.joined(separator: ", "))]
+                """
         } else {
             return """
-            "oneOf": [\(enumCases.map { "{ \"const\": \($0) }" }.joined(separator: ", "))]
-            """
+                "oneOf": [\(enumCases.map { "{ \"const\": \($0) }" }.joined(separator: ", "))]
+                """
         }
     }
 
@@ -64,12 +86,13 @@ extension JSONSchemaMacro {
             )
 
             var schema = """
-            "\(property.name)": [
-            """
+                "\(property.name)": [
+                """
 
             schema += "\n\(generateTabs(depth: depth))\(baseSchema)"
 
-            schema += ",\n\(generateTabs(depth: depth))\"required\": \(property.isOptional ? "false" : "true")"
+            schema +=
+                ",\n\(generateTabs(depth: depth))\"required\": \(property.isOptional ? "false" : "true")"
 
             if let description = property.description {
                 schema += ",\n\(generateTabs(depth: depth))\"description\": \"\(description)\""
@@ -88,15 +111,15 @@ extension JSONSchemaMacro {
         }.joined(separator: ",\n    ")
 
         return """
-        static func jsonSchema() -> [String: Any] {
-            return [
-                "type": "object",
-                "properties": [
-                    \(raw: schemaProperties)
+            static func jsonSchema() -> [String: Any] {
+                return [
+                    "type": "object",
+                    "properties": [
+                        \(raw: schemaProperties)
+                    ]
                 ]
-            ]
-        }
-        """ as DeclSyntax
+            }
+            """ as DeclSyntax
     }
 
     private static func generateTypeSchema(
@@ -113,12 +136,12 @@ extension JSONSchemaMacro {
         if type.hasPrefix("[") && type.hasSuffix("]") {
             let elementType = String(type.dropFirst().dropLast())
             return """
-            "type": "array",
-            "items": [
-            \(generateTabs(depth: depth + 1))\(generateTypeSchema(for: elementType, enumCases: nil, depth: depth + 1))
-            \(generateTabs(depth: depth))
-            ]
-            """
+                "type": "array",
+                "items": [
+                \(generateTabs(depth: depth + 1))\(generateTypeSchema(for: elementType, enumCases: nil, depth: depth + 1))
+                \(generateTabs(depth: depth))
+                ]
+                """
         }
 
         // Handle basic types
@@ -130,8 +153,8 @@ extension JSONSchemaMacro {
             // Assume it's a nested object type
             // You'll need to recursively process the type definition
             return """
-            "type": "object",\n"properties": \(generateNestedObjectSchema(for: type, depth: depth))
-            """
+                "type": "object",\n"properties": \(generateNestedObjectSchema(for: type, depth: depth))
+                """
         }
     }
 }
@@ -144,11 +167,11 @@ extension JSONSchemaMacro {
         guard let attributes = attributeList else { return nil }
         for attribute in attributes {
             guard let attr = attribute.as(AttributeSyntax.self),
-                  attr.attributeName.description == "Property",
-                  let arguments = attr.arguments?.as(LabeledExprListSyntax.self),
-                  let exampleArg = arguments.first(where: { argument in
-                      argument.label?.text == "example"
-                  })?.expression
+                attr.attributeName.description == "Property",
+                let arguments = attr.arguments?.as(LabeledExprListSyntax.self),
+                let exampleArg = arguments.first(where: { argument in
+                    argument.label?.text == "example"
+                })?.expression
             else {
                 continue
             }
@@ -170,9 +193,9 @@ extension JSONSchemaMacro {
 
         for attribute in attributes {
             guard let attr = attribute.as(AttributeSyntax.self),
-                  attr.attributeName.description == "Property",
-                  let arguments = attr.arguments?.as(LabeledExprListSyntax.self),
-                  let firstArg = arguments.first?.expression.as(StringLiteralExprSyntax.self)
+                attr.attributeName.description == "Property",
+                let arguments = attr.arguments?.as(LabeledExprListSyntax.self),
+                let firstArg = arguments.first?.expression.as(StringLiteralExprSyntax.self)
             else {
                 continue
             }
@@ -194,10 +217,11 @@ extension JSONSchemaMacro {
 
             for binding in varDecl.bindings {
                 guard let pat = binding.pattern.as(IdentifierPatternSyntax.self),
-                      let type = binding.typeAnnotation?.type else { continue }
+                    let type = binding.typeAnnotation?.type
+                else { continue }
 
                 let propertyName = pat.identifier.text
-                let typeText = type.description
+                let typeText = type.description.trimmingCharacters(in: .whitespaces)
                 let isOptional = typeText.hasSuffix("?")
                 let baseType = isOptional ? String(typeText.dropLast()) : typeText
 
@@ -206,7 +230,11 @@ extension JSONSchemaMacro {
                 let defaultValue = extractDefaultValue(from: binding.initializer)
                 let enumCases = try extractEnumCases(from: baseType, in: context)
 
-                properties.append((propertyName, baseType, isOptional, description, example, defaultValue, enumCases))
+                properties.append(
+                    (
+                        propertyName, baseType, isOptional, description, example, defaultValue,
+                        enumCases
+                    ))
             }
         }
 
