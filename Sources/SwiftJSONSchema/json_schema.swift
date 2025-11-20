@@ -29,6 +29,7 @@ public protocol JSONSchemaRepresentable {
 /// }
 /// ```
 @attached(member, names: named(jsonSchema))
+@attached(extension, conformances: JSONSchemaRepresentable)
 public macro Schema() = #externalMacro(module: "SwiftJSONSchemaMacros", type: "JSONSchemaMacro")
 
 @attached(peer)
